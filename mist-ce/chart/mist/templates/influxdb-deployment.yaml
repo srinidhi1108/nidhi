@@ -1,0 +1,55 @@
+{{ if eq .Values.influxdb.host "" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chart.fullname" . }}-influxdb
+  labels:
+    app: influxdb
+    chart: {{ include "chart.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      release: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: influxdb
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: influxdb
+        image: influxdb:1.8.4
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: INFLUXDB_DB
+          value: telegraf
+        resources:
+          requests:
+            memory: 50Mi
+            cpu: 30m
+          limits:
+            memory: 2048Mi
+            cpu: 2000m
+        volumeMounts:
+        - name: influxdb-config
+          mountPath: /etc/influxdb/influxdb.conf
+          subPath: influxdb.conf
+        - mountPath: /var/lib/influxdb
+          name: influxdb
+      volumes:
+      - name: influxdb-config
+        configMap:
+          name: {{ include "chart.fullname" . }}-influxdb
+      - name: influxdb
+        persistentVolumeClaim:
+          claimName: {{ include "chart.fullname" . }}-influxdb
+{{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+{{- end }}
+{{- end }}

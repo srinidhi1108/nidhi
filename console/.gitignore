@@ -1,0 +1,34 @@
+# Config
+!public/config/default.json
+!public/config/development.json.sample
+public/config/*
+
+
+# Logs
+npm-debug.log*
+
+
+# NPM
+node_modules/
+node_modules.nosync/
+
+
+# Transpiled code
+dist
+.out
+
+
+# Dev tools
+.DS_Store
+.vscode
+.idea
+*.swp
+*.bak
+
+
+# Tests
+coverage/
+
+
+# Assets
+src/assets

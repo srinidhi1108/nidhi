@@ -1,0 +1,57 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "chart.fullname" . }}
+  labels:
+    app: nginx
+    chart: {{ include "chart.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+  annotations:
+{{- if .Values.http.tlsSecret }}
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    {{- if .Values.http.http2 }}
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    {{- end }}
+    {{- if .Values.http.tlsClusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ .Values.http.tlsClusterIssuer }}
+    {{- end }}
+    nginx.org/websocket-services: {{ include "chart.fullname" . }}-nginx
+{{- end }}
+{{- if .Values.http.tlsAnnotations }}
+{{ toYaml .Values.http.tlsAnnotations | indent 4 }}
+{{- end }}
+spec:
+  ingressClassName: "nginx"
+{{- if .Values.http.tlsSecret }}
+  tls:
+    - secretName: {{ .Values.http.tlsSecret }}
+      hosts:
+  {{- if .Values.http.tlsHosts }}
+{{ toYaml .Values.http.tlsHosts | indent 8 }}
+  {{- else }}
+        - {{ .Values.http.host }}
+  {{- end }}
+{{- end }}
+  rules:
+  {{- if and (ne "localhost" .Values.http.host) (not (include "check.isIpAddress" .Values.http.host)) }}
+  - host: {{ .Values.http.host }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: {{ include "chart.fullname" . }}-nginx
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  {{- else }}
+  - http:
+      paths:
+      - backend:
+          service:
+            name: {{ include "chart.fullname" . }}-nginx
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  {{ end }}
+

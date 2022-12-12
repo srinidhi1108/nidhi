@@ -1,0 +1,21 @@
+apiVersion: ensurance.crane.io/v1alpha1
+kind: NodeQOSEnsurancePolicy
+metadata:
+  name: "schedule-delay"
+  labels:
+    app: "system"
+spec:
+  nodeQualityProbe:
+    initialDelaySeconds: 10
+    timeoutSeconds: 10
+    nodeLocalGet:
+      localCacheTTLSeconds: 60
+  objectiveEnsurances:
+    - name: "container-schedule-delay-time"
+      avoidanceThreshold: 1
+      restoreThreshold: 10
+      actionName: "throttle"
+      strategy: "None"
+      metricRule:
+        name: "container_sched_run_queue_time"
+        value: 500

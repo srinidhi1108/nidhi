@@ -1,0 +1,28 @@
+builds:
+- env:
+  - CGO_ENABLED=0
+  goos: 
+    - linux
+    - darwin
+    - windows
+  ldflags:
+     - -s -w -X finala/version.version={{.Version}} -X finala/version.commit={{.Commit}} -X finala/version.date={{.Date}} -X finala/version.builtBy=goreleaser
+archives:
+  - id: finala
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      386: i386
+      amd64: x86_64
+
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next" 
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'

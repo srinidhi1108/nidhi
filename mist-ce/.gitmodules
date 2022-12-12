@@ -1,0 +1,21 @@
+[submodule "api"]
+	path = api
+	url = ../mist.api.git
+[submodule "ui"]
+	path = ui
+	url = ../mist.ui.git
+[submodule "landing"]
+	path = landing
+	url = ../mist.landing.git
+[submodule "tests"]
+	path = tests
+	url = ../mist.tests.git
+[submodule "docker/nginx/static/novnc"]
+	path = docker/nginx/static/novnc
+	url = https://github.com/novnc/noVNC.git
+[submodule "orchestration"]
+	path = orchestration
+	url = ../mist.orchestration.git
+[submodule "portal"]
+	path = portal
+	url = ../mist-portal

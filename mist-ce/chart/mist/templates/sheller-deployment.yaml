@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chart.fullname" . }}-sheller
+  labels:
+    app: sheller
+    chart: {{ include "chart.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: sheller
+        release: {{ .Release.Name }}
+    spec:
+      imagePullSecrets:
+{{ toYaml .Values.image.secrets | indent 8 }}
+      containers:
+      - name: sheller
+        args:
+        - /app
+        - --listen
+        - 0.0.0.0:8086
+        image: {{ .Values.image.registry }}/sheller:{{.Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+          limits:
+            memory: 300Mi
+            cpu: 1000m
+          requests:
+            memory: 20Mi
+            cpu: 1m
+        env:
+          - name: INTERNAL_KEYS_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "chart.fullname" . }}-internal-keys-secret
+                key: secret
+                optional: false
+          - name: INTERNAL_KEYS_SIGN
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "chart.fullname" . }}-internal-keys-secret
+                key: sign
+                optional: false
+          - name: RABBITMQ_HOST
+            value: {{ .Release.Name }}-rabbitmq
+          - name: RABBITMQ_USERNAME
+            value: {{ .Values.rabbitmq.auth.username }}
+          - name: RABBITMQ_PASSWORD
+            value: {{ .Values.rabbitmq.auth.password }}
+{{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+{{- end }}

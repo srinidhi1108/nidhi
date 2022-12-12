@@ -1,0 +1,188 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "chart.fullname" . }}-{{ .Values.productShortName }}
+  labels:
+    app: {{ .Values.productShortName }}
+    chart: {{ include "chart.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+  settings.py: |
+    PORTAL_URI = "http{{ if .Values.http.tlsSecret }}s{{end}}://{{ .Values.http.host }}"
+
+    MAILER_SETTINGS = {
+      {{- if .Values.smtp.host }}
+        'mail.host': "{{ .Values.smtp.host }}",
+        'mail.port': "{{ .Values.smtp.port }}",
+        'mail.tls': {{ if .Values.smtp.tls }}True{{ else }}False{{ end }},
+        'mail.starttls': {{ if .Values.smtp.starttls }}True{{ else }}False{{ end }},
+        'mail.username': "{{ .Values.smtp.username }}",
+        'mail.password': "{{ .Values.smtp.password }}"
+      {{- else }}
+        'mail.host': "{{ include "chart.fullname" . }}-mailmock",
+        'mail.port': "8025",
+        'mail.tls': False,
+        'mail.starttls': False,
+        'mail.username': "",
+        'mail.password': ""
+      {{- end }}
+    }
+
+    ENABLE_DEV_USERS = {{ if .Values.enableDevUsers }}True{{ else }}False{{ end }}
+    JS_BUILD = {{ if .Values.jsBuild }}True{{ else }}False{{ end }}
+
+    ELASTICSEARCH = {
+      {{- if .Values.elasticsearch.host }}
+        'elastic_host': "{{ .Values.elasticsearch.host }}",
+        'elastic_port': "{{ .Values.elasticsearch.port }}",
+        'elastic_username': "{{ .Values.elasticsearch.username }}",
+        'elastic_password': "{{ .Values.elasticsearch.password }}",
+        'elastic_use_ssl': {{ if .Values.elasticsearch.tls }}True{{ else }}False{{ end }},
+        'elastic_verify_certs': {{ if .Values.elasticsearch.verifyCerts }}True{{ else }}False{{ end }},
+      {{- else }}
+        'elastic_host': "{{ include "chart.fullname" . }}-elasticsearch",
+        'elastic_port': "9200",
+        'elastic_username': "",
+        'elastic_password': "",
+        'elastic_use_ssl': False,
+        'elastic_verify_certs': False,
+      {{- end }}
+    }
+
+    {{ if .Values.victoriametrics.enabled -}}
+    {{ if .Values.victoriametrics.deploy -}}
+    VICTORIAMETRICS_URI = "http://{{ .Release.Name }}-vmselect.{{ .Release.Namespace }}.svc.cluster.local:8481/select/<org_id>/prometheus"
+    VICTORIAMETRICS_WRITE_URI = "http://{{ .Release.Name }}-vminsert.{{ .Release.Namespace }}.svc.cluster.local:8480/insert/<org_id>/prometheus"
+    {{- else -}}
+    VICTORIAMETRICS_URI = "{{ .Values.victoriametrics.readEndpoint }}/select/<org_id>/prometheus"
+    VICTORIAMETRICS_WRITE_URI = "{{ .Values.victoriametrics.writeEndpoint }}/insert/<org_id>/prometheus"
+    {{- end }}
+    {{- else -}}
+    VICTORIAMETRICS_URI = ""
+    VICTORIAMETRICS_WRITE_URI = ""
+    {{- end }}
+
+    INFLUX = {
+      {{- if .Values.influxdb.host }}
+        'host': "http://{{ .Values.influxdb.host }}:{{ .Values.influxdb.port }}",
+        'backup': "{{ .Values.influxdb.host }}:8088",
+        'db': "{{ .Values.influxdb.db }}",
+      {{- else }}
+        'host': "http://{{ include "chart.fullname" . }}-influxdb:8086",
+        'backup': '{{ include "chart.fullname" . }}-influxdb:8088',
+        'db': "telegraf",
+      {{- end }}
+    }
+
+    {{ if .Values.vault.deploy -}}
+    VAULT_ADDR = "http://{{ .Release.Name }}-vault:8200"
+    VAULT_TOKEN = ""
+    VAULT_ROLE_ID = ""
+    VAULT_SECRET_ID = ""
+    {{- else -}}
+    VAULT_ADDR = "{{ .Values.vault.address }}"
+    {{ if .Values.vault.roleId -}}
+    VAULT_ROLE_ID = "{{ .Values.vault.roleId}}"
+    VAULT_SECRET_ID = "{{ .Values.vault.secretId}}"
+    {{- else -}}
+    VAULT_TOKEN = "{{ .Values.vault.token }}"
+    {{- end }}
+    {{- end }}
+
+    STRIPE_SECRET_APIKEY = "{{ .Values.stripe.secretApiKey }}"
+    STRIPE_PUBLIC_APIKEY = "{{ .Values.stripe.publicApiKey }}"
+
+    {{ if .Values.rabbitmq.deploy -}}
+    AMQP_URI = "{{ .Release.Name }}-rabbitmq:5672"
+    BROKER_URL = "amqp://{{ .Values.rabbitmq.auth.username }}:{{ .Values.rabbitmq.auth.password }}@{{ .Release.Name }}-rabbitmq:5672/"
+    {{- else -}}
+    AMQP_URI = "{{ .Values.rabbitmqExternal.host }}:{{ .Values.rabbitmqExternal.port }}"
+    BROKER_URL = "amqp://{{ .Values.rabbitmqExternal.username }}:{{ .Values.rabbitmqExternal.password }}@{{ .Values.rabbitmqExternal.host }}:{{ .Values.rabbitmqExternal.port }}/"
+    {{- end }}
+
+    {{- if .Values.memcached.host }}
+    MEMCACHED_HOST = ["{{ .Values.memcached.host }}"]
+    {{- else }}
+    MEMCACHED_HOST = ["{{ include "chart.fullname" . }}-memcached:11211"]
+    {{- end }}
+
+    {{- if .Values.docker.host }}
+    DOCKER_IP = "{{ .Values.docker.host }}"
+    DOCKER_PORT = "{{ .Values.docker.port }}"
+    {{ else if .Values.docker.deploy }}
+    DOCKER_IP = "{{ include "chart.fullname" . }}-dockerhost"
+    DOCKER_PORT = "2375"  
+    {{- else }}
+    DOCKER_IP = ""
+    DOCKER_PORT = ""
+    {{- end }}
+
+    DOCKER_TLS_KEY = """
+{{ .Values.docker.key | indent 4 }}
+    """.strip()
+    DOCKER_TLS_CERT = """
+{{ .Values.docker.cert | indent 4 }}
+    """.strip()
+    DOCKER_TLS_CA = """
+{{ .Values.docker.ca | indent 4 }}
+    """.strip()
+
+    DEFAULT_MONITORING_METHOD = "{{ .Values.monitoring.defaultMethod }}"
+
+  {{- if .Values.mongodb.deploy }}
+    MONGO_URI = "{{ .Release.Name }}-mongodb:27017"
+  {{- else }}
+    MONGO_URI = "{{ .Values.mongodb.host }}{{ if .Values.mongodb.port }}:{{ .Values.mongodb.port }}{{ end }}"
+  {{- end }}
+
+    GITHUB_BOT_TOKEN = "{{ .Values.githubBotToken }}"
+
+    SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = "{{ .Values.auth.google.key }}"
+    SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = "{{ .Values.auth.google.secret }}"
+    SOCIAL_AUTH_GITHUB_KEY = "{{ .Values.auth.github.key }}"
+    SOCIAL_AUTH_GITHUB_SECRET = "{{ .Values.auth.github.secret }}"
+    ALLOW_SIGNUP_EMAIL = {{ if .Values.auth.email.signup }}True{{ else }}False{{ end }}
+    ALLOW_SIGNIN_EMAIL = {{ if .Values.auth.email.signin }}True{{ else }}False{{ end }}
+    ALLOW_SIGNUP_GOOGLE = {{ if .Values.auth.google.signup }}True{{ else }}False{{ end }}
+    ALLOW_SIGNIN_GOOGLE = {{ if .Values.auth.google.signin }}True{{ else }}False{{ end }}
+    ALLOW_SIGNUP_GITHUB = {{ if .Values.auth.github.signup }}True{{ else }}False{{ end }}
+    ALLOW_SIGNIN_GITHUB = {{ if .Values.auth.github.signin }}True{{ else }}False{{ end }}
+
+    GITLAB_TOKEN = "{{ .Values.gitlabToken }}"
+    BILLING_NOTIFICATIONS_WEBHOOK = "{{ .Values.slackWebhooks.billing }}"
+    MIXPANEL_TOKEN = "{{ .Values.mixpanelToken }}"
+    CUSTOMERIO_SITEID = "{{ .Values.customerio.siteId }}"
+    CUSTOMERIO_APIKEY = "{{ .Values.customerio.apiKey }}"
+    GOOGLE_ANALYTICS_ID = "{{ .Values.googleAnalyticsId }}"
+    CHATWOOT_TOKEN = "{{ .Values.chatwootToken }}"
+    SENDGRID_EMAIL_NOTIFICATIONS_KEY = "{{ .Values.sendgridEmailNotificationsKey }}"
+
+    INTERNAL_API_URL = "http://{{ include "chart.fullname" . }}-api"
+    INTERNAL_API_V2_URL = "http://{{ include "chart.fullname" . }}-api-v2:8080"
+    INTERNAL_SOCKJS_HOST = "{{ include "chart.fullname" . }}-sockjs-headless"
+    UI_TEMPLATE_URL = "http://{{ include "chart.fullname" . }}-ui"
+    LANDING_TEMPLATE_URL = "http://{{ include "chart.fullname" . }}-landing"
+    TRAEFIK_API = "http://{{ include "chart.fullname" . }}-traefik:8080"
+    CILIA_TRIGGER_API = "http://{{ include "chart.fullname" . }}-api"
+    GOCKY_HOST = "{{ include "chart.fullname" . }}-gocky"
+
+    BACKUP = {
+        "key": "{{ .Values.backup.key }}",
+        "secret": "{{ .Values.backup.secret }}",
+        "bucket": "{{ .Values.backup.bucket }}",
+        "region": "{{ .Values.backup.region }}",
+        "gpg": {
+            "recipient": "{{ .Values.backup.gpg.recipient }}",
+            "public":  """{{ .Values.backup.gpg.public | indent 4 }}""".strip()
+        }
+    }
+    SENTRY_CONFIG = {
+      'TRACES_SAMPLE_RATE': 0.2,
+      'API_V1_URL': "{{ .Values.sentry.api }}",
+      'API_V2_URL': "{{ .Values.sentry.apiv2 }}",
+      'SOCK_JS_URL': "{{ .Values.sentry.sockjs }}",
+      'DRAMATIQ_URL': "{{ .Values.sentry.dramatiq }}",
+      'ENVIRONMENT': "{{ .Release.Name }}",
+    }
+{{ .Values.extraSettings | indent 4 }}

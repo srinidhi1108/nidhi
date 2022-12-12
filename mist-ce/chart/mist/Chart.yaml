@@ -1,0 +1,6 @@
+name: mist-ce
+description: A Helm Chart for Mist CE.
+version: 0.0.0
+appVersion: "0.0.0"
+apiVersion: v1
+icon: https://raw.githubusercontent.com/mistio/mist.ui/master/assets/app-icon-32.png

@@ -1,0 +1,51 @@
+{{ if eq .Values.elasticsearch.host "" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chart.fullname" . }}-elasticsearch
+  labels:
+    app: elasticsearch
+    chart: {{ include "chart.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      release: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: elasticsearch
+        image: elasticsearch:7.10.1
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+          - name: ES_JAVA_OPTS
+            value: "-Xms256M -Xmx256M"
+          - name: discovery.type
+            value: single-node
+        resources:
+          requests:
+            memory: 3000Mi
+            cpu: 50m
+          limits:
+            memory: 4000Mi
+            cpu: 2000m
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: elasticsearch
+      volumes:
+      - name: elasticsearch
+        persistentVolumeClaim:
+          claimName: {{ include "chart.fullname" . }}-elasticsearch
+{{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+{{- end }}
+{{- end }}

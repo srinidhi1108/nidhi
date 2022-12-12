@@ -1,0 +1,118 @@
+version: 2.1
+jobs:
+  build_frontend:
+    docker:
+      - image: circleci/node:14.15-stretch-browsers
+    working_directory: ~/komiser
+    resource_class: large
+    steps:
+      - checkout
+      - restore_cache:
+          key: node-modules-{{checksum "dashboard/package.json"}}
+      - run:
+          name: Install dependencies
+          command: cd dashboard && npm install
+      - save_cache:
+          key: node-modules-{{checksum "dashboard/package.json"}}
+          paths:
+            - dashboard/node_modules
+      - run:
+          name: Build artifact
+          command: cd dashboard && npm run build
+      - persist_to_workspace:
+          root: dashboard
+          paths:
+            - out
+  build_cli:
+    docker:
+      - image: golang:1.19.3
+    working_directory: /go/src/github.com/tailwarden/komiser
+    resource_class: large
+    steps:
+      - checkout
+      - attach_workspace:
+          at: /tmp/dashboard
+      - run:
+          name: Install dependencies
+          command: |
+            go mod download
+      - run:
+          name: Install go-bin-data
+          command: |
+           go install -a -v github.com/go-bindata/go-bindata/...@latest
+           go install -v github.com/elazarl/go-bindata-assetfs/...
+      - run:
+         name: Fix path
+         command: mv /tmp/dashboard/out .
+      - run:
+         name: Create assets
+         command: |
+            go-bindata-assetfs -o internal/api/v1/template.go out/...
+            sed -i -e 's/package main/package v1/g' internal/api/v1/template.go
+      - run:
+         name: Build binary
+         command: |
+            make build
+            make package
+      - run:
+         name: Install AWS CLI
+         command: |
+          apt-get update
+          apt-get install -y awscli
+          chmod +x bin/komiser_windows_amd64.exe bin/komiser_darwin_amd64 bin/komiser_darwin_arm64 bin/komiser_linux_amd64
+      - run:
+          name: Push Linux binary
+          command: aws s3 cp bin/komiser_linux_amd64 s3://komiser-releases/3.0.0/linux/komiser --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers
+      - run:
+          name: Push Windows binary
+          command: aws s3 cp bin/komiser_windows_amd64.exe s3://komiser-releases/3.0.0/windows/komiser --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers
+      - run:
+          name: Push Mac OS X binary
+          command: |
+            aws s3 cp bin/komiser_darwin_amd64 s3://komiser-releases/3.0.0/osx/amd/komiser --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers
+            aws s3 cp bin/komiser_darwin_arm64 s3://komiser-releases/3.0.0/osx/arm/komiser --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers
+            aws cloudfront create-invalidation --distribution-id ERO8W9KAFNCBV --paths "/*"
+
+  build_docker:
+    docker:
+       - image: docker:20.10.6
+    resource_class: large
+    steps:
+        - checkout
+        - setup_remote_docker
+        - run:
+            name: Build Komiser Docker Image
+            command: docker build -t tailwarden/komiser:latest .
+        - deploy:
+            name: Push Komiser to DockerHub
+            command: |
+              docker login -u$DOCKERHUB_LOGIN -p$DOCKERHUB_PASSWORD
+              docker tag tailwarden/komiser:latest tailwarden/komiser:${CIRCLE_SHA1}
+              docker tag tailwarden/komiser:latest tailwarden/komiser:3.0.0
+              docker push tailwarden/komiser:latest
+              docker push tailwarden/komiser:3.0.0
+              docker push tailwarden/komiser:${CIRCLE_SHA1}
+      
+workflows:
+    version: 2
+    build_and_deploy:
+        jobs:
+            - build_frontend:
+                filters:
+                    branches:
+                        only:
+                            - master
+            - build_cli:
+                requires:
+                    - build_frontend
+                filters:
+                    branches:
+                        only:
+                            - master
+            - build_docker:
+                requires:
+                    - build_cli
+                filters:
+                    branches:
+                        only:
+                            - master
